@@ -1,101 +1,233 @@
+"use client";
+
+import React, { useContext, useState } from "react";
+import { Box, Typography, Button, InputBase } from "@mui/material";
+import Navbar from "@/components/layout/Navbar";
 import Image from "next/image";
+import PromptContext from "@/context/promptContext";
+import { useRouter } from "next/navigation";
+
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [alignment, setAlignment] = useState("buy");
+  const [filters, setFilters] = useState({
+    where: "",
+    price: "",
+    bedsBath: "",
+    propertyType: "",
+    furnishing: "",
+  });
+  const router = useRouter()
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const handleInputChange = (key: string, value: string) => {
+    setFilters((prevFilters) => ({
+      ...prevFilters,
+      [key]: value,
+    }));
+  };
+  const { setPreferences } = useContext(PromptContext)
+  const handleSearch = () => {
+    const { where, price, bedsBath, furnishing, propertyType } = filters
+    const prompt = `I want to ${alignment} a property of type ${propertyType} which is located at ${where}, with a price range of ${price}, my preference regarding beds and bath is ${bedsBath}, and if ${furnishing}, it would be great.`
+    console.log(filters, alignment);
+    setPreferences(prompt)
+    router.push("/chat")
+  };
+
+
+
+
+
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        backgroundColor: "#F9FAFB",
+      }}
+    >
+      <Navbar />
+
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          justifyContent: "space-between",
+          padding: { xs: "24px", sm: "32px", md: "64px" },
+          gap: { xs: 3, md: 4 },
+          marginTop: { xs: "24px", md: "45px" },
+        }}
+      >
+        {/* Left Section */}
+        <Box sx={{ flex: 1 }}>
+          <Typography
+            variant="h3"
+            fontWeight="700"
+            gutterBottom
+            sx={{ fontSize: { xs: "2rem", sm: "2.5rem", md: "3rem" } }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Hey, I'm an Opportunity Finder
+          </Typography>
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            sx={{
+              maxWidth: "80%",
+              marginBottom: 4,
+              fontSize: { xs: "0.875rem", md: "1rem" }
+            }}
           >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+            Lorem ipsum dolor sit amet, consectetur sadipscing elitr, sed diam
+            nonumy eirmod tempor.
+          </Typography>
+          <Typography variant="h5" fontWeight="700" sx={{ marginBottom: 2 }}>
+            What are you looking for today?
+          </Typography>
+
+          {/* Buy/Sell Toggle */}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              backgroundColor: "#F1F3F5",
+              borderRadius: "30px",
+              padding: "4px",
+              maxWidth: "200px",
+              marginBottom: 4,
+            }}
+          >
+            <Box
+              onClick={() => setAlignment("buy")}
+              sx={{
+                flex: 1,
+                textAlign: "center",
+                padding: "8px 16px",
+                borderRadius: "30px",
+                fontWeight: "600",
+                fontSize: "1rem",
+                cursor: "pointer",
+                backgroundColor: alignment === "buy" ? "#000" : "transparent",
+                color: alignment === "buy" ? "#FFF" : "#000",
+                transition: "all 0.3s ease",
+              }}
+            >
+              Buy
+            </Box>
+            <Box
+              onClick={() => setAlignment("rent")}
+              sx={{
+                flex: 1,
+                textAlign: "center",
+                padding: "8px 16px",
+                borderRadius: "30px",
+                fontWeight: "600",
+                fontSize: "1rem",
+                cursor: "pointer",
+                backgroundColor: alignment === "sell" ? "#000" : "transparent",
+                color: alignment === "sell" ? "#FFF" : "#000",
+                transition: "all 0.3s ease",
+              }}
+            >
+              Rent
+            </Box>
+          </Box>
+
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              gap: { xs: 2, md: 2 },
+              backgroundColor: "#FFF",
+              borderRadius: "100px",
+              padding: { xs: "20px", md: "16px 40px" },
+              boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
+              marginBottom: 3,
+              overflowX: { xs: "hidden", md: "visible" },
+            }}
+          >
+            {[
+              { label: "Where", placeholder: "Address, City or Zip", key: "where" },
+              { label: "Price", placeholder: "Add price", key: "price" },
+              { label: "Beds & Bath", placeholder: "Add bed & bath", key: "bedsBath" },
+              { label: "Property Type", placeholder: "Property", key: "propertyType" },
+              { label: "Furnishing", placeholder: "Furnishing", key: "furnishing" },
+            ].map(({ label, placeholder, key }) => (
+              <Box
+                key={key}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "start",
+                  width: { xs: "100%", md: "150px" },
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  fontWeight="500"
+                  mb={0.5}
+                >
+                  {label}
+                </Typography>
+                <InputBase
+                  placeholder={placeholder}
+                  value={filters[key as keyof typeof filters]}
+                  onChange={(e) => handleInputChange(key, e.target.value)}
+                  sx={{
+                    width: "100%",
+                    padding: "4px 8px",
+                    borderRadius: "8px",
+                    border: "none",
+                    fontSize: "0.9rem",
+                    outline: "none",
+                  }}
+                />
+              </Box>
+            ))}
+          </Box>
+
+          {/* Search Button */}
+          <Button
+            onClick={handleSearch}
+            variant="contained"
+            sx={{
+              backgroundColor: "#1D4ED8",
+              color: "#FFF",
+              borderRadius: "50px",
+              padding: "10px 30px",
+              fontWeight: "600",
+              textTransform: "capitalize",
+              fontSize: "1rem",
+              width: { xs: "100%", sm: "auto" },
+              "&:hover": { backgroundColor: "#174BAC" },
+            }}
+          >
+            Search
+          </Button>
+        </Box>
+
+        {/* Right Section (Image) */}
+        <Box
+          sx={{
+            flex: 1,
+            height: "100%",
+            position: "relative",
+            display: { xs: "none", md: "block" },
+          }}
         >
           <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+            src="/dash.png"
+            alt="Property Image"
+            width={500}
+            height={500}
+            style={{
+              borderRadius: "16px",
+              objectFit: "cover",
+              maxWidth: "100%",
+              height: "auto",
+            }}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        </Box>
+      </Box>
+    </Box>
   );
 }
