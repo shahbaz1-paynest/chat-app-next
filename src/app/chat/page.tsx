@@ -53,6 +53,13 @@ interface FormattedProperty {
   image: string;
 }
 
+interface PropertyMetrics {
+  annualRent: string;
+  maintenance: string;
+  timeToRent: string;
+  capitalGain: string;
+}
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -64,19 +71,32 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [properties, setProperties] = useState<FormattedProperty[]>([]);
   const { preferences } = useContext(PromptContext);
-  const router = useRouter()
+  const router = useRouter();
   
   const responseRef = useRef("");
   const socketRef = useRef<Socket | null>(null);
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-  const calculatePropertyMetrics = (price: string): {
-    annualRent: string;
-    maintenance: string;
-    timeToRent: string;
-    capitalGain: string;
-  } => {
+  const calculatePropertyMetrics = (price: string | undefined): PropertyMetrics => {
+    if (!price) {
+      return {
+        annualRent: '0k',
+        maintenance: '0k',
+        timeToRent: '0 Days',
+        capitalGain: '0%'
+      };
+    }
+
     const numericPrice = parseFloat(price.replace(/[^0-9.]/g, ''));
+    
+    if (isNaN(numericPrice)) {
+      return {
+        annualRent: '0k',
+        maintenance: '0k',
+        timeToRent: '0 Days',
+        capitalGain: '0%'
+      };
+    }
     
     const annualRent = (numericPrice * 0.08).toFixed(0);
     const maintenance = (numericPrice * 0.01).toFixed(0);
@@ -95,14 +115,33 @@ export default function ChatPage() {
     const metrics = calculatePropertyMetrics(rawProperty.price);
     
     return {
-      title: rawProperty.title.length > 40 ? 
+      title: rawProperty.title?.length > 40 ? 
         rawProperty.title.substring(0, 37) + '...' : 
-        rawProperty.title,
-      price: `${(parseInt(rawProperty.price)/1000).toFixed(0)}k, ${rawProperty.area} sq.ft`,
-      location: `${rawProperty.building_name}, ${rawProperty.city_area_name}`,
-      image: rawProperty.image_urls[0] || '/dash.png',
+        rawProperty.title || '',
+      price: rawProperty.price ? 
+        `${(parseInt(rawProperty.price)/1000).toFixed(0)}k, ${rawProperty.area || 0} sq.ft` : 
+        '0k, 0 sq.ft',
+      location: `${rawProperty.building_name || ''}, ${rawProperty.city_area_name || ''}`,
+      image:'/dash.png',
       ...metrics
     };
+  };
+
+  const parseProperties = (data: string): RawProperty[] => {
+    try {
+      // Replace single quotes with double quotes for valid JSON
+      const jsonString = data.replace(/'/g, '"')
+        // Handle potential escaped single quotes
+        .replace(/\\/g, '')
+        // Remove any wrapping quotes
+        .replace(/^["']|["']$/g, '');
+      
+      const parsed = JSON.parse(jsonString);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      console.error('Failed to parse property data:', e);
+      return [];
+    }
   };
 
   useEffect(() => {
@@ -116,20 +155,30 @@ export default function ChatPage() {
       console.log('Connected to socket server');
     });
 
-    socketRef.current.on('suggestions', (rawProperties: RawProperty[]) => {
-      const formattedProperties = rawProperties.map(transformProperty);
-      setProperties(prevProperties => {
-        const uniqueProperties = [...prevProperties];
-        formattedProperties.forEach(newProp => {
-          const existingIndex = uniqueProperties.findIndex(
-            prop => prop.title === newProp.title && prop.location === newProp.location
-          );
-          if (existingIndex === -1) {
-            uniqueProperties.push(newProp);
-          }
+    socketRef.current.on('suggestions', (data: string | RawProperty[]) => {
+      let rawProperties: RawProperty[];
+      
+      if (typeof data === 'string') {
+        rawProperties = parseProperties(data);
+      } else {
+        rawProperties = Array.isArray(data) ? data : [data];
+      }
+
+      if (rawProperties.length > 0) {
+        const formattedProperties = rawProperties.map(transformProperty);
+        setProperties(prevProperties => {
+          const uniqueProperties = [...prevProperties];
+          formattedProperties.forEach(newProp => {
+            const existingIndex = uniqueProperties.findIndex(
+              prop => prop.title === newProp.title && prop.location === newProp.location
+            );
+            if (existingIndex === -1) {
+              uniqueProperties.push(newProp);
+            }
+          });
+          return uniqueProperties;
         });
-        return uniqueProperties;
-      });
+      }
     });
 
     socketRef.current.on('connect_error', (error) => {
@@ -142,6 +191,7 @@ export default function ChatPage() {
       }
     };
   }, []);
+
 
   const extractContentFromChunk = (chunk: string): string | null => {
     const regex = /content='([^']+)'/g;
@@ -160,8 +210,11 @@ export default function ChatPage() {
       setIsLoading(true);
       responseRef.current = "";
 
-      setMessages(prev => [...prev, { text: userMessage, isSender: true }]);
-      setMessages(prev => [...prev, { text: "", isSender: false }]);
+      setMessages(prev => [
+        ...prev, 
+        { text: userMessage, isSender: true },
+        { text: "", isSender: false }
+      ]);
 
       const response = await fetch(`${baseUrl}/api/chat/`, {
         method: "POST",
@@ -241,10 +294,10 @@ export default function ChatPage() {
         height: '72px',
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton sx={{ color: '#000', '&:hover': { backgroundColor: '#F3F4F6' } }}
-          onClick={()=>{
-            router.push("/")
-          }}>
+          <IconButton 
+            sx={{ color: '#000', '&:hover': { backgroundColor: '#F3F4F6' } }}
+            onClick={() => router.push("/")}
+          >
             <ArrowBackIosNewIcon />
           </IconButton>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>

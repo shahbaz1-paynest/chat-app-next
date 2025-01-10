@@ -171,7 +171,7 @@ export default function Home() {
                 <InputBase
                   placeholder={placeholder}
                   value={filters[key as keyof typeof filters]}
-                  onChange={(e) => handleInputChange(key, e.target.value)}
+                  onChange={(e:any) => handleInputChange(key, e.target.value)}
                   sx={{
                     width: "100%",
                     padding: "4px 8px",
