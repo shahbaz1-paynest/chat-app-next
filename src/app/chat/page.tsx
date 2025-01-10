@@ -70,9 +70,10 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [properties, setProperties] = useState<FormattedProperty[]>([]);
+  const [sessionId, setSessionId] = useState<string>("");
   const { preferences } = useContext(PromptContext);
   const router = useRouter();
-  
+
   const responseRef = useRef("");
   const socketRef = useRef<Socket | null>(null);
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -88,7 +89,7 @@ export default function ChatPage() {
     }
 
     const numericPrice = parseFloat(price.replace(/[^0-9.]/g, ''));
-    
+
     if (isNaN(numericPrice)) {
       return {
         annualRent: '0k',
@@ -97,15 +98,15 @@ export default function ChatPage() {
         capitalGain: '0%'
       };
     }
-    
+
     const annualRent = (numericPrice * 0.08).toFixed(0);
     const maintenance = (numericPrice * 0.01).toFixed(0);
     const timeToRent = Math.floor(Math.random() * (21 - 7) + 7);
-    const capitalGain = ((Math.random() * (12 - 5) + 5)).toFixed(0); 
-    
+    const capitalGain = ((Math.random() * (12 - 5) + 5)).toFixed(0);
+
     return {
-      annualRent: `${(parseInt(annualRent)/1000).toFixed(0)}k`,
-      maintenance: `${(parseInt(maintenance)/1000).toFixed(1)}k`,
+      annualRent: `${(parseInt(annualRent) / 1000).toFixed(0)}k`,
+      maintenance: `${(parseInt(maintenance) / 1000).toFixed(1)}k`,
       timeToRent: `${timeToRent} Days`,
       capitalGain: `${capitalGain}%`
     };
@@ -113,34 +114,73 @@ export default function ChatPage() {
 
   const transformProperty = (rawProperty: RawProperty): FormattedProperty => {
     const metrics = calculatePropertyMetrics(rawProperty.price);
-    
+
     return {
-      title: rawProperty.title?.length > 40 ? 
-        rawProperty.title.substring(0, 37) + '...' : 
+      title: rawProperty.title?.length > 40 ?
+        rawProperty.title.substring(0, 37) + '...' :
         rawProperty.title || '',
-      price: rawProperty.price ? 
-        `${(parseInt(rawProperty.price)/1000).toFixed(0)}k, ${rawProperty.area || 0} sq.ft` : 
+      price: rawProperty.price ?
+        `${(parseInt(rawProperty.price) / 1000).toFixed(0)}k, ${rawProperty.area || 0} sq.ft` :
         '0k, 0 sq.ft',
       location: `${rawProperty.building_name || ''}, ${rawProperty.city_area_name || ''}`,
-      image:'/dash.png',
+      image: '/dash.png',
       ...metrics
     };
   };
 
   const parseProperties = (data: string): RawProperty[] => {
     try {
-      // Replace single quotes with double quotes for valid JSON
       const jsonString = data.replace(/'/g, '"')
-        // Handle potential escaped single quotes
         .replace(/\\/g, '')
-        // Remove any wrapping quotes
         .replace(/^["']|["']$/g, '');
-      
+
       const parsed = JSON.parse(jsonString);
       return Array.isArray(parsed) ? parsed : [parsed];
     } catch (e) {
       console.error('Failed to parse property data:', e);
       return [];
+    }
+  };
+
+  const initializeSession = async (socketId: string) => {
+    try {
+      const response = await fetch(`${baseUrl}/api/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ socket_id: socketId }),
+      });
+      console.log(response);
+
+
+      if (!response.ok) {
+        throw new Error('Failed to initialize session');
+      }
+
+      const data = await response.json();
+      setSessionId(data.session_id);
+    } catch (error: any) {
+      console.log(error)
+    }
+  };
+
+  const endSession = async () => {
+    if (sessionId) {
+      try {
+        await fetch(`${baseUrl}/api/end`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+        console.log(sessionId);
+
+      } catch (error: any) {
+        // console.error('Error ending session:', error);
+        console.log(error)
+      }
     }
   };
 
@@ -153,11 +193,14 @@ export default function ChatPage() {
 
     socketRef.current.on('connect', () => {
       console.log('Connected to socket server');
+      if (socketRef.current) {
+        initializeSession(socketRef.current.id || "");
+      }
     });
 
     socketRef.current.on('suggestions', (data: string | RawProperty[]) => {
       let rawProperties: RawProperty[];
-      
+
       if (typeof data === 'string') {
         rawProperties = parseProperties(data);
       } else {
@@ -186,12 +229,23 @@ export default function ChatPage() {
     });
 
     return () => {
+      endSession();
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
     };
   }, []);
 
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      endSession();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [sessionId]);
 
   const extractContentFromChunk = (chunk: string): string | null => {
     const regex = /content='([^']+)'/g;
@@ -211,7 +265,7 @@ export default function ChatPage() {
       responseRef.current = "";
 
       setMessages(prev => [
-        ...prev, 
+        ...prev,
         { text: userMessage, isSender: true },
         { text: "", isSender: false }
       ]);
@@ -219,7 +273,10 @@ export default function ChatPage() {
       const response = await fetch(`${baseUrl}/api/chat/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: userMessage }),
+        body: JSON.stringify({
+          prompt: userMessage,
+          session_id: sessionId
+        }),
       });
 
       if (!response.ok) {
@@ -234,7 +291,7 @@ export default function ChatPage() {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        
+
         if (value) {
           const chunk = decoder.decode(value);
           const content = extractContentFromChunk(chunk);
@@ -281,50 +338,74 @@ export default function ChatPage() {
       handleSendMessage();
     }
   };
-
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#F9FAFB' }}>
+    <Box sx={{
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: '#F9FAFB',
+      overflow: 'hidden'
+    }}>
       <Box sx={{
-        padding: '16px 24px',
+        padding: { xs: '12px 16px', md: '16px 24px' },
         borderBottom: '1px solid #E5E7EB',
         backgroundColor: '#FFF',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        height: '72px',
+        height: { xs: '64px', md: '72px' },
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton 
-            sx={{ color: '#000', '&:hover': { backgroundColor: '#F3F4F6' } }}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, md: 2 } }}>
+          <IconButton
+            sx={{
+              color: '#000',
+              '&:hover': { backgroundColor: '#F3F4F6' },
+              padding: { xs: '6px', md: '8px' }
+            }}
             onClick={() => router.push("/")}
           >
-            <ArrowBackIosNewIcon />
+            <ArrowBackIosNewIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' } }} />
           </IconButton>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Typography variant="h6" sx={{
+            fontWeight: 600,
+            fontSize: { xs: '1.1rem', md: '1.25rem' }
+          }}>
             Dubai Properties
           </Typography>
         </Box>
-        <Button variant="contained" sx={{ 
-          backgroundColor: '#1D4ED8',
-          '&:hover': { backgroundColor: '#1e40af' },
-        }}>
+        <Button
+          variant="contained"
+          sx={{
+            backgroundColor: '#1D4ED8',
+            '&:hover': { backgroundColor: '#1e40af' },
+            padding: { xs: '6px 12px', md: '8px 16px' },
+            fontSize: { xs: '0.875rem', md: '1rem' }
+          }}
+        >
           Share
         </Button>
       </Box>
 
-      <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Box sx={{ 
+      <Box sx={{
+        display: 'flex',
+        flex: 1,
+        overflow: 'hidden',
+        flexDirection: { xs: 'column', md: 'row' }
+      }}>
+        <Box sx={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: '#F9FAFB',
+          height: { xs: 'calc(100vh - 64px)', md: 'auto' }
         }}>
           <Box sx={{
             flex: 1,
             overflowY: 'auto',
-            padding: '24px',
+            padding: { xs: '16px', md: '24px' },
             display: 'flex',
             flexDirection: 'column',
+            height: { xs: 'calc(100vh - 180px)', md: 'auto' }
           }}>
             {messages.map((message, index) => (
               <MessageBubble
@@ -336,11 +417,16 @@ export default function ChatPage() {
           </Box>
 
           <Box sx={{
-            padding: '16px 24px',
+            padding: { xs: '12px 16px', md: '16px 24px' },
             borderTop: '1px solid #E5E7EB',
             backgroundColor: '#FFF',
+            position: { xs: 'fixed', md: 'relative' },
+            bottom: { xs: 0, md: 'auto' },
+            left: { xs: 0, md: 'auto' },
+            right: { xs: 0, md: 'auto' },
+            width: '100%'
           }}>
-            <Box sx={{ display: 'flex', gap: 2 }}>
+            <Box sx={{ display: 'flex', gap: { xs: 1, md: 2 } }}>
               <InputBase
                 fullWidth
                 multiline
@@ -351,11 +437,11 @@ export default function ChatPage() {
                 onKeyPress={handleKeyPress}
                 disabled={isLoading}
                 sx={{
-                  padding: '12px 16px',
+                  padding: { xs: '8px 12px', md: '12px 16px' },
                   backgroundColor: '#F3F4F6',
                   borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  minHeight: '48px',
+                  fontSize: { xs: '0.875rem', md: '1rem' },
+                  minHeight: { xs: '40px', md: '48px' }
                 }}
               />
               <IconButton
@@ -364,27 +450,31 @@ export default function ChatPage() {
                 sx={{
                   backgroundColor: '#1D4ED8',
                   color: '#FFF',
-                  width: '48px',
-                  height: '48px',
-                  minWidth: '48px',
-                  minHeight: '48px',
+                  width: { xs: '40px', md: '48px' },
+                  height: { xs: '40px', md: '48px' },
+                  minWidth: { xs: '40px', md: '48px' },
+                  minHeight: { xs: '40px', md: '48px' },
                   flexShrink: 0,
                   '&:hover': { backgroundColor: '#1e40af' },
                   '&.Mui-disabled': {
                     backgroundColor: '#E5E7EB',
                     color: '#9CA3AF',
-                    width: "50px",
-                    height: "50px"
+                    width: { xs: "40px", md: "50px" },
+                    height: { xs: "40px", md: "50px" }
                   },
                 }}
               >
-                <SendIcon />
+                <SendIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' } }} />
               </IconButton>
             </Box>
           </Box>
         </Box>
 
-        <Sidebar properties={properties} />
+        <Box sx={{
+          display: { xs: 'none', md: 'block' },
+        }}>
+          <Sidebar properties={properties} />
+        </Box>
       </Box>
     </Box>
   );

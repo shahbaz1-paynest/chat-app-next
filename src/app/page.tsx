@@ -7,7 +7,6 @@ import Image from "next/image";
 import PromptContext from "@/context/promptContext";
 import { useRouter } from "next/navigation";
 
-
 export default function Home() {
   const [alignment, setAlignment] = useState("buy");
   const [filters, setFilters] = useState({
@@ -17,7 +16,8 @@ export default function Home() {
     propertyType: "",
     furnishing: "",
   });
-  const router = useRouter()
+  const router = useRouter();
+  const { setPreferences } = useContext(PromptContext);
 
   const handleInputChange = (key: string, value: string) => {
     setFilters((prevFilters) => ({
@@ -25,26 +25,23 @@ export default function Home() {
       [key]: value,
     }));
   };
-  const { setPreferences } = useContext(PromptContext)
+
   const handleSearch = () => {
-    const { where, price, bedsBath, furnishing, propertyType } = filters
-    const prompt = `I want to ${alignment} a property of type ${propertyType} which is located at ${where}, with a price range of ${price}, my preference regarding beds and bath is ${bedsBath}, and if ${furnishing}, it would be great.`
-    console.log(filters, alignment);
-    setPreferences(prompt)
-    router.push("/chat")
+    const { where, price, bedsBath, furnishing, propertyType } = filters;
+    const prompt = `I want to ${alignment} a property of type ${propertyType} which is located at ${where}, with a price range of ${price}, my preference regarding beds and bath is ${bedsBath}, and if ${furnishing}, it would be great.`;
+    setPreferences(prompt);
+    router.push("/chat");
   };
-
-
-
-
 
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        overflow: "auto",
         backgroundColor: "#F9FAFB",
+        height: "100vh",
       }}
     >
+      {/* Navbar */}
       <Navbar />
 
       <Box
@@ -52,13 +49,17 @@ export default function Home() {
           display: "flex",
           flexDirection: { xs: "column", md: "row" },
           justifyContent: "space-between",
-          padding: { xs: "24px", sm: "32px", md: "64px" },
-          gap: { xs: 3, md: 4 },
-          marginTop: { xs: "24px", md: "45px" },
+          height: "calc(100vh - 72px)", // Full screen height minus navbar height
         }}
       >
         {/* Left Section */}
-        <Box sx={{ flex: 1 }}>
+        <Box
+          sx={{
+            flex: 1,
+            padding: { xs: "24px", sm: "32px", md: "64px" },
+            overflowY: "auto",
+          }}
+        >
           <Typography
             variant="h3"
             fontWeight="700"
@@ -73,7 +74,7 @@ export default function Home() {
             sx={{
               maxWidth: "80%",
               marginBottom: 4,
-              fontSize: { xs: "0.875rem", md: "1rem" }
+              fontSize: { xs: "0.875rem", md: "1rem" },
             }}
           >
             Lorem ipsum dolor sit amet, consectetur sadipscing elitr, sed diam
@@ -83,7 +84,7 @@ export default function Home() {
             What are you looking for today?
           </Typography>
 
-          {/* Buy/Sell Toggle */}
+          {/* Buy/Rent Toggle */}
           <Box
             sx={{
               display: "flex",
@@ -122,8 +123,8 @@ export default function Home() {
                 fontWeight: "600",
                 fontSize: "1rem",
                 cursor: "pointer",
-                backgroundColor: alignment === "sell" ? "#000" : "transparent",
-                color: alignment === "sell" ? "#FFF" : "#000",
+                backgroundColor: alignment === "rent" ? "#000" : "transparent",
+                color: alignment === "rent" ? "#FFF" : "#000",
                 transition: "all 0.3s ease",
               }}
             >
@@ -137,7 +138,7 @@ export default function Home() {
               flexDirection: { xs: "column", md: "row" },
               gap: { xs: 2, md: 2 },
               backgroundColor: "#FFF",
-              borderRadius: "100px",
+              borderRadius: { xs: "16px", md: "100px" },
               padding: { xs: "20px", md: "16px 40px" },
               boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
               marginBottom: 3,
@@ -171,7 +172,7 @@ export default function Home() {
                 <InputBase
                   placeholder={placeholder}
                   value={filters[key as keyof typeof filters]}
-                  onChange={(e:any) => handleInputChange(key, e.target.value)}
+                  onChange={(e: any) => handleInputChange(key, e.target.value)}
                   sx={{
                     width: "100%",
                     padding: "4px 8px",
@@ -185,7 +186,6 @@ export default function Home() {
             ))}
           </Box>
 
-          {/* Search Button */}
           <Button
             onClick={handleSearch}
             variant="contained"
@@ -205,11 +205,10 @@ export default function Home() {
           </Button>
         </Box>
 
-        {/* Right Section (Image) */}
         <Box
           sx={{
-            flex: 1,
-            height: "100%",
+            width: { md: "30%" },
+            height: "100%", 
             position: "relative",
             display: { xs: "none", md: "block" },
           }}
@@ -217,13 +216,10 @@ export default function Home() {
           <Image
             src="/dash.png"
             alt="Property Image"
-            width={500}
-            height={500}
+            fill
             style={{
-              borderRadius: "16px",
+              borderRadius: "0px",
               objectFit: "cover",
-              maxWidth: "100%",
-              height: "auto",
             }}
           />
         </Box>

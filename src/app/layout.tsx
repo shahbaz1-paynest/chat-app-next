@@ -29,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={` antialiased overflow-hidden`} // Default to no scroll
+        className={` antialiased`} // Default to no scroll
       >
         <PromptContextProvider>
         <ThemeProvider theme={theme}>
